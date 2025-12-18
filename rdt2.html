@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>RDT - Rota do Pará</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <style>
+        body {
+            font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            background-color: #fbfffe;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #d4d4d4;
+            padding-bottom: 5px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+        }
+
+        .tab-btn {
+            padding: 8px 20px;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            background-color: #fff;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            font-weight: bold;
+            color: #107c41;
+        }
+
+        .btn-download {
+            background-color: #107c41;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+        }
+
+        .btn-download:hover {
+            background-color: #0c5e31;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 16pt;
+            color: #666;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 1000px;
+            background-color: white;
+        }
+
+        th,
+        td {
+            border: 1px solid #bfbfbf;
+            padding: 2px 4px;
+            white-space: nowrap;
+            height: 20px;
+            overflow: hidden;
+            font-size: 10pt;
+        }
+
+        th {
+            background-color: #f3f3f3;
+            font-weight: normal;
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #bfbfbf;
+        }
+
+        .col-number {
+            text-align: right;
+        }
+
+        .col-date {
+            text-align: right;
+        }
+
+        .center-text {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .right-text {
+            text-align: right;
+            vertical-align: middle;
+        }
+
+        .bold-text {
+            font-weight: bold;
+        }
+
+        .header-merged {
+            background-color: #fff;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 14pt;
+        }
+
+        .header-rdt-title {
+            font-size: 12pt;
+        }
+
+        .form-select {
+            border: none;
+            font-family: inherit;
+            font-size: 11pt;
+            width: 100%;
+            text-align: center;
+            background: transparent;
+            cursor: pointer;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-select:focus {
+            outline: none;
+        }
+
+        .cell-label {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            vertical-align: middle;
+        }
+
+        tr:hover td {
+            background-color: #e8f5fd;
+        }
+
+        .sheet-container {
+            overflow: auto;
+            max-height: 85vh;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="loading">Carregando dados do RDT (Aguarde)...</div>
+
+    <div id="app" style="display: none;">
+        <div class="toolbar">
+            <div class="tabs">
+                <button class="tab-btn">RDT</button>
+            </div>
+            <button class="btn-download" onclick="downloadExcelJS()">
+                <span>⬇</span> Download Excel
+            </button>
+        </div>
+
+        <div class="sheet-container">
+            <table id="table-rdt">
+                <colgroup>
+                    <col style="width: 50px;">
+                    <col style="width: 50px;">
+                    <col style="width: 40px;">
+                    <col style="width: 40px;">
+                    <col style="width: 40px;">
+                    <col style="width: 40px;">
+                    <col style="width: 60px;">
+                    <col style="width: 100px;">
+                    <col style="width: 50px;">
+                    <col style="width: 50px;">
+                    <col style="width: 150px;">
+                    <col style="width: 30px;">
+                    <col style="width: 30px;">
+                    <col style="width: 30px;">
+                    <col style="width: 30px;">
+                    <col style="width: 30px;">
+                    <col style="width: 80px;">
+                    <col style="width: 100px;">
+                    <col style="width: 30px;">
+                    <col style="width: 100px;">
+                    <col style="width: 100px;">
+                    <col style="width: 30px;">
+                    <col style="width: 80px;">
+                </colgroup>
+                <thead id="rdt-header"></thead>
+                <tbody id="rdt-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Global data
+        let baseRotaData = [];
+        let uniqueMonths = [];
+        let uniquePracas = [];
+
+        const categoryLabels = ['CAT-01', 'CAT-02', 'CAT-03', 'CAT-04', 'CAT-05', 'CAT-06', 'CAT-07', 'CAT-08', 'CAT-09', 'CAT-10', 'CAT-11', 'CAT-ESP'];
+
+        const pracaMap = {
+            "P1": { city: "JACUNDÁ", road: "PA-150", km: "KM 52+600" },
+            "P2": { city: "GOIANÉSIA DO PARÁ I - PA", road: "PA-150", km: "KM 112+800" },
+            "P3": { city: "GOIANÉSIA DO PARÁ II - PA", road: "PA-150", km: "KM 179+700" },
+            "P4": { city: "MOJU - PA", road: "PA-150", km: "KM 229+800" },
+            "P5": { city: "TAILÂNDIA - PA", road: "PA-150", km: "KM 295+100" },
+            "P6": { city: "ACARÁ I - PA", road: "PA-475", km: "KM 13+500" },
+            "P7": { city: "ABAETETUBA", road: "PA-252", km: "KM 31+900" },
+            "P8": { city: "ACARÁ II", road: "ALÇA VIÁRIA", km: "KM 21+950" }
+        };
+
+        // Fetch and process data on load
+        async function init() {
+            try {
+                let data;
+
+                // Try PHP proxy first (when running on server)
+                try {
+                    const response = await fetch('api_data.php');
+                    if (response.ok) {
+                        data = await response.json();
+                    } else {
+                        throw new Error('PHP proxy failed');
+                    }
+                } catch (e) {
+                    // Fallback: Use CORS proxy for direct file access
+                    console.log('Using CORS proxy fallback...');
+                    const googleDriveUrl = 'https://drive.google.com/uc?export=download&id=1SX1GbGAgEqRici21rxQ0JHVzwyt_qEXe';
+                    const corsProxy = 'https://corsproxy.io/?';
+                    const response = await fetch(corsProxy + encodeURIComponent(googleDriveUrl));
+                    data = await response.json();
+                }
+
+                processData(data);
+                buildUI();
+                setDefaults();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+            } catch (err) {
+                document.getElementById('loading').innerHTML = 'Erro ao carregar dados: ' + err.message;
+            }
+        }
+
+        function processData(data) {
+            const limitDate = new Date("2025-08-14");
+            const months = {};
+            const pracas = {};
+
+            for (const row of data) {
+                // Extract date
+                if (row.dia) {
+                    row.dia = row.dia.split('T')[0];
+                } else {
+                    continue;
+                }
+
+                // Filter by date
+                try {
+                    const rowDate = new Date(row.dia);
+                    if (rowDate <= limitDate) continue;
+                } catch (e) { continue; }
+
+                // Process idtipoviolacao
+                if (!row.idtipoviolacao) row.idtipoviolacao = "0";
+
+                // Process categoria_cat
+                if (row.categoria_cat) {
+                    let cat = row.categoria_cat;
+                    cat = cat.replace("-", "-0");
+                    cat = cat.replace("011", "11");
+                    cat = cat.replace("0ESP", "ESP");
+                    cat = cat.replace("010", "10");
+                    cat = cat.replace("012", "12");
+                    row.categoria_cat = cat;
+                }
+
+                // Filter by tipo
+                if (!row.tipo || (row.tipo !== "1" && row.tipo !== "3")) continue;
+
+                // Set defaults
+                row.praca = row.praca || '';
+                row.total_transacoes = parseFloat(row.total_transacoes) || 0;
+                row.soma_valor = parseFloat(row.soma_valor) || 0;
+                row.eixos_adicionais = parseFloat(row.eixos_adicionais) || 0;
+
+                baseRotaData.push(row);
+
+                // Extract unique values
+                const m = row.dia.substring(0, 7);
+                months[m] = true;
+
+                let pDisplay = String(row.praca || '');
+                if (pDisplay && pDisplay.startsWith('19')) {
+                    pDisplay = 'P' + pDisplay.substring(2);
+                }
+                if (pDisplay) pracas[pDisplay] = true;
+            }
+
+            uniqueMonths = Object.keys(months).sort();
+            uniquePracas = Object.keys(pracas).sort();
+        }
+
+        function buildUI() {
+            buildHeader();
+            buildBody();
+        }
+
+        function buildHeader() {
+            const thead = document.getElementById('rdt-header');
+
+            // Month options
+            const monthOptions = uniqueMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+
+            // Praça options
+            const pracaOptions = uniquePracas.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            thead.innerHTML = `
+                <tr>
+                    <th rowspan="3" colspan="2" class="header-merged" style="padding: 0;">
+                        <img src="rota.png" alt="Rota do Pará" style="max-width: 100%; max-height: 80px; display: block; margin: auto;">
+                    </th>
+                    <th colspan="19" class="header-merged header-rdt-title">CENTRO DE CONTROLE DE ARRECADAÇÃO</th>
+                    <th rowspan="2" colspan="2" class="header-merged" style="font-size: 20pt;">RDT</th>
+                </tr>
+                <tr><th colspan="19" class="header-merged header-rdt-title">RESUMO DIÁRIO DE TRÁFEGO</th></tr>
+                <tr>
+                    <th colspan="19" class="header-merged header-rdt-title">ROTA DO PARÁ S/A</th>
+                    <th colspan="2" class="header-merged" style="padding: 0;">
+                        <select id="month-select" class="form-select" onchange="filterRDT(this.value)">
+                            <option value="">Mês</option>${monthOptions}
+                        </select>
+                    </th>
+                </tr>
+                <tr style="height: 30px;">
+                    <td colspan="2" class="cell-label center-text">DATA</td>
+                    <td colspan="4"></td>
+                    <td class="cell-label center-text">PRAÇA</td>
+                    <td style="padding: 0;">
+                        <select id="praca-select" class="form-select" onchange="updatePracaFields(this.value)">
+                            <option value="">Selecione</option>
+                            <option value="TODAS">TODAS</option>
+                            ${pracaOptions}
+                        </select>
+                    </td>
+                    <td colspan="2" class="cell-label right-text">MUNICÍPIO</td>
+                    <td id="rdt-municipio" class="center-text bold-text"></td>
+                    <td colspan="5"></td>
+                    <td id="rdt-rodovia" class="center-text bold-text"></td>
+                    <td id="rdt-km" class="center-text bold-text"></td>
+                    <td></td>
+                    <td class="center-text">COBRANÇA</td>
+                    <td class="center-text">DIRECIONAL</td>
+                    <td></td>
+                    <td class="center-text">OUTROS</td>
+                </tr>
+                <tr>
+                    <th rowspan="2" class="center-text">DIA</th>
+                    <th rowspan="2" class="center-text">SEM</th>
+                    <th colspan="15" class="center-text">VEÍCULOS ABSOLUTOS (PEDAGIADO)</th>
+                    <th rowspan="2" class="center-text" style="font-size: 9pt;">EIXOS ADICIONAIS</th>
+                    <th colspan="3" class="center-text">VEÍCULOS EQUIVALENTES</th>
+                    <th rowspan="2" class="center-text" style="font-size: 9pt;">RECEITA DO TRÁFEGO PEDAGIADO</th>
+                    <th rowspan="2" class="center-text" style="font-size: 9pt;">VEÍCULOS ESPECIAIS</th>
+                </tr>
+                <tr>
+                    <th class="center-text">CAT-01</th><th class="center-text">CAT-02</th><th class="center-text">CAT-03</th>
+                    <th class="center-text">CAT-04</th><th class="center-text">CAT-05</th><th class="center-text">CAT-06</th>
+                    <th class="center-text">CAT-07</th><th class="center-text">CAT-08</th><th class="center-text">CAT-09</th>
+                    <th class="center-text">CAT-10</th><th class="center-text">CAT-11</th><th class="center-text">CAT-ESP</th>
+                    <th class="center-text">LEVE</th><th class="center-text">PESADO</th><th class="center-text">TOTAL</th>
+                    <th class="center-text">LEVE</th><th class="center-text">PESADO</th><th class="center-text">TOTAL</th>
+                </tr>
+                <tr>
+                    <th class="center-text"></th><th class="center-text"></th>
+                    <th class="center-text">REAL</th><th class="center-text">REAL</th><th class="center-text">REAL</th>
+                    <th class="center-text">REAL</th><th class="center-text">REAL</th><th class="center-text">REAL</th>
+                    <th class="center-text">REAL</th><th class="center-text">REAL</th><th class="center-text">REAL</th>
+                    <th class="center-text">REAL</th><th class="center-text">REAL</th><th class="center-text">REAL</th>
+                    <th class="center-text">REAL</th><th class="center-text">REAL</th><th class="center-text">REAL</th>
+                    <th class="center-text"></th>
+                    <th class="center-text">REAL</th><th class="center-text">REAL</th><th class="center-text">REAL</th>
+                    <th class="center-text">REAL</th><th class="center-text"></th>
+                </tr>
+            `;
+        }
+
+        function buildBody() {
+            const tbody = document.getElementById('rdt-body');
+            let html = '';
+
+            // 31 data rows
+            for (let r = 0; r < 31; r++) {
+                html += '<tr><td class="col-date"></td><td class="center-text"></td>';
+                for (let c = 2; c < 23; c++) html += '<td class="col-number"></td>';
+                html += '</tr>';
+            }
+
+            // TOTAL row
+            html += '<tr id="rdt-total-row" style="font-weight: bold; background-color: #f0f0f0;">';
+            html += '<td colspan="2" class="center-text">TOTAL</td>';
+            for (let c = 2; c < 23; c++) html += '<td class="col-number"></td>';
+            html += '</tr>';
+
+            // MÉDIA row
+            html += '<tr id="rdt-media-row" style="font-weight: bold; background-color: #e8e8e8;">';
+            html += '<td colspan="2" class="center-text">MÉDIA</td>';
+            for (let c = 2; c < 23; c++) html += '<td class="col-number"></td>';
+            html += '</tr>';
+
+            tbody.innerHTML = html;
+        }
+
+        function setDefaults() {
+            const now = new Date();
+            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+            const monthSelect = document.getElementById('month-select');
+            for (let i = 0; i < monthSelect.options.length; i++) {
+                if (monthSelect.options[i].value === currentMonth) {
+                    monthSelect.value = currentMonth;
+                    break;
+                }
+            }
+            if (!monthSelect.value && monthSelect.options.length > 1) {
+                monthSelect.value = monthSelect.options[1].value;
+            }
+
+            const pracaSelect = document.getElementById('praca-select');
+            for (let i = 0; i < pracaSelect.options.length; i++) {
+                if (pracaSelect.options[i].value === 'P1') {
+                    pracaSelect.value = 'P1';
+                    break;
+                }
+            }
+
+            if (pracaSelect.value) updatePracaFields(pracaSelect.value);
+            if (monthSelect.value) filterRDT(monthSelect.value);
+        }
+
+        function updatePracaFields(val) {
+            const municField = document.getElementById('rdt-municipio');
+            const rodoviaField = document.getElementById('rdt-rodovia');
+            const kmField = document.getElementById('rdt-km');
+
+            if (val === 'TODAS') {
+                municField.innerText = "";
+                rodoviaField.innerText = "";
+                kmField.innerText = "";
+            } else if (pracaMap[val]) {
+                municField.innerText = pracaMap[val].city;
+                rodoviaField.innerText = pracaMap[val].road;
+                kmField.innerText = pracaMap[val].km;
+            } else {
+                municField.innerText = "";
+                rodoviaField.innerText = "";
+                kmField.innerText = "";
+            }
+
+            const monthSelect = document.getElementById('month-select');
+            if (monthSelect && monthSelect.value) {
+                filterRDT(monthSelect.value);
+            }
+        }
+
+        function filterRDT(month) {
+            if (!month) return;
+
+            const [year, monthNum] = month.split('-').map(Number);
+            const daysInMonth = new Date(year, monthNum, 0).getDate();
+            const dayNames = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+
+            const tbody = document.getElementById('rdt-body');
+            const rows = tbody.querySelectorAll('tr:not(#rdt-total-row):not(#rdt-media-row)');
+
+            const pracaSelect = document.getElementById('praca-select');
+            const selectedPraca = pracaSelect.value;
+
+            for (let day = 1; day <= 31; day++) {
+                const row = rows[day - 1];
+                if (!row) continue;
+
+                if (day <= daysInMonth) {
+                    const date = new Date(year, monthNum - 1, day);
+                    const dayStr = String(day).padStart(2, '0');
+                    const monthStr = String(monthNum).padStart(2, '0');
+                    const dateDisplay = `${dayStr}/${monthStr}`;
+                    const fullDate = `${year}-${monthStr}-${dayStr}`;
+
+                    row.cells[0].innerText = dateDisplay;
+                    row.cells[1].innerText = dayNames[date.getDay()];
+
+                    if (selectedPraca) {
+                        calculateRowValues(row, fullDate, selectedPraca);
+                    } else {
+                        for (let i = 2; i < row.cells.length; i++) row.cells[i].innerText = '';
+                    }
+                } else {
+                    for (let i = 0; i < row.cells.length; i++) row.cells[i].innerText = '';
+                }
+            }
+
+            calculateSummaryRows(daysInMonth);
+        }
+
+        function calculateRowValues(row, fullDate, selectedPraca) {
+            const aggregateAll = (selectedPraca === 'TODAS');
+            let pracaValue = selectedPraca;
+            if (!aggregateAll && selectedPraca.startsWith('P')) {
+                pracaValue = '19' + selectedPraca.substring(1);
+            }
+
+            const baseCriteria = { 'dia': fullDate };
+            const getCriteria = (category) => {
+                const c = { ...baseCriteria };
+                if (category) c.categoria_cat = category;
+                if (!aggregateAll) c.praca = pracaValue;
+                return c;
+            };
+
+            const categorySums = [];
+            for (let i = 0; i < categoryLabels.length; i++) {
+                const sum = sumIfs(baseRotaData, 'total_transacoes', getCriteria(categoryLabels[i]));
+                categorySums.push(sum);
+                row.cells[2 + i].innerText = sum || '';
+            }
+
+            const leve = (categorySums[0] || 0) + (categorySums[2] || 0) + (categorySums[4] || 0);
+            row.cells[14].innerText = leve || '';
+
+            const pesado = (categorySums[1] || 0) + (categorySums[3] || 0) + (categorySums[5] || 0) +
+                (categorySums[6] || 0) + (categorySums[7] || 0) + (categorySums[8] || 0) +
+                (categorySums[9] || 0) + (categorySums[10] || 0);
+            row.cells[15].innerText = pesado || '';
+            row.cells[16].innerText = (leve + pesado) || '';
+
+            const eixosCriteria = { ...baseCriteria };
+            if (!aggregateAll) eixosCriteria.praca = pracaValue;
+            const eixosAdicionais = sumIfs(baseRotaData, 'eixos_adicionais', eixosCriteria);
+            row.cells[17].innerText = eixosAdicionais || '';
+
+            const leveEq = (categorySums[0] || 0) * 1 + (categorySums[2] || 0) * 1.5 + (categorySums[4] || 0) * 2;
+            row.cells[18].innerText = leveEq ? leveEq.toFixed(2) : '';
+
+            const pesadoEq = (categorySums[1] || 0) * 2 + (categorySums[3] || 0) * 3 + (categorySums[5] || 0) * 4 +
+                (categorySums[6] || 0) * 5 + (categorySums[7] || 0) * 6 + (categorySums[8] || 0) * 7 +
+                (categorySums[9] || 0) * 8 + (categorySums[10] || 0) * 9 + (eixosAdicionais || 0);
+            row.cells[19].innerText = pesadoEq ? pesadoEq.toFixed(2) : '';
+            row.cells[20].innerText = (leveEq + pesadoEq) ? (leveEq + pesadoEq).toFixed(2) : '';
+
+            const revenueCriteria = { ...baseCriteria };
+            if (!aggregateAll) revenueCriteria.praca = pracaValue;
+            const revenue = sumIfs(baseRotaData, 'soma_valor', revenueCriteria);
+            row.cells[21].innerText = revenue ? formatBRL(revenue) : '';
+            row.cells[21].setAttribute('data-value', revenue || 0);
+        }
+
+        function calculateSummaryRows(daysInMonth) {
+            const tbody = document.getElementById('rdt-body');
+            const dataRows = tbody.querySelectorAll('tr:not(#rdt-total-row):not(#rdt-media-row)');
+            const totalRow = document.getElementById('rdt-total-row');
+            const mediaRow = document.getElementById('rdt-media-row');
+
+            const columnSums = Array(20).fill(0);
+            let validRowCount = 0;
+
+            for (let r = 0; r < daysInMonth && r < dataRows.length; r++) {
+                const row = dataRows[r];
+                if (row.cells[0].innerText) {
+                    let rowHasData = false;
+                    for (let c = 2; c <= 21; c++) {
+                        const cellText = row.cells[c].innerText;
+                        let value = 0;
+                        if (cellText.startsWith('R$')) {
+                            value = parseFloat(cellText.replace('R$', '').trim().replace(/\./g, '').replace(',', '.')) || 0;
+                        } else if (cellText.includes(',')) {
+                            value = parseFloat(cellText.replace(',', '.')) || 0;
+                        } else {
+                            value = parseFloat(cellText) || 0;
+                        }
+                        columnSums[c - 2] += value;
+                        if (value > 0) rowHasData = true;
+                    }
+                    if (rowHasData) validRowCount++;
+                }
+            }
+
+            for (let c = 0; c < 20; c++) {
+                const sum = columnSums[c];
+                if (c === 19) {
+                    totalRow.cells[c + 1].innerText = sum ? formatBRL(sum) : '';
+                    totalRow.cells[c + 1].setAttribute('data-value', sum || 0);
+                } else if (c >= 16 && c <= 18) {
+                    totalRow.cells[c + 1].innerText = sum ? sum.toFixed(2) : '';
+                } else {
+                    totalRow.cells[c + 1].innerText = sum || '';
+                }
+            }
+
+            for (let c = 0; c < 20; c++) {
+                const avg = validRowCount > 0 ? columnSums[c] / validRowCount : 0;
+                if (c === 19) {
+                    mediaRow.cells[c + 1].innerText = avg ? formatBRL(avg) : '';
+                    mediaRow.cells[c + 1].setAttribute('data-value', avg || 0);
+                } else if (c >= 16 && c <= 18) {
+                    mediaRow.cells[c + 1].innerText = avg ? avg.toFixed(2) : '';
+                } else {
+                    mediaRow.cells[c + 1].innerText = avg ? avg.toFixed(2) : '';
+                }
+            }
+        }
+
+        function sumIfs(data, sumColumn, criteria) {
+            let sum = 0;
+            for (const row of data) {
+                let match = true;
+                for (const [col, val] of Object.entries(criteria)) {
+                    if (row[col] != val) { match = false; break; }
+                }
+                if (match) sum += parseFloat(row[sumColumn]) || 0;
+            }
+            return sum;
+        }
+
+        function formatBRL(value) {
+            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+
+        function downloadExcelJS() {
+            const table = document.getElementById('table-rdt');
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('RDT');
+
+            // Set column widths
+            worksheet.getColumn(1).width = 8;
+            worksheet.getColumn(2).width = 6;
+            worksheet.getColumn(3).width = 8;
+            worksheet.getColumn(4).width = 8;
+            worksheet.getColumn(5).width = 8;
+            worksheet.getColumn(6).width = 8;
+            worksheet.getColumn(7).width = 8;
+            worksheet.getColumn(8).width = 8;
+            worksheet.getColumn(9).width = 8;
+            worksheet.getColumn(10).width = 8;
+            worksheet.getColumn(11).width = 8;
+            worksheet.getColumn(12).width = 8;
+            worksheet.getColumn(13).width = 8;
+            worksheet.getColumn(14).width = 9;
+            worksheet.getColumn(15).width = 8;
+            worksheet.getColumn(16).width = 9;
+            worksheet.getColumn(17).width = 9;
+            worksheet.getColumn(18).width = 10;
+            worksheet.getColumn(19).width = 10;
+            worksheet.getColumn(20).width = 10;
+            worksheet.getColumn(21).width = 10;
+            worksheet.getColumn(22).width = 16;
+            worksheet.getColumn(23).width = 10;
+
+            const rows = table.rows;
+            for (let i = 0; i < rows.length; i++) {
+                const tr = rows[i];
+                const row = worksheet.getRow(i + 1);
+                let colIndex = 1;
+
+                for (let j = 0; j < tr.cells.length; j++) {
+                    const td = tr.cells[j];
+                    while (worksheet.getCell(i + 1, colIndex).isMerged) colIndex++;
+
+                    const cell = row.getCell(colIndex);
+                    let val = td.innerText.trim();
+                    const select = td.querySelector('select');
+                    if (select) val = select.value || '';
+
+                    let cellValue = val;
+
+                    if (td.hasAttribute('data-value')) {
+                        cellValue = parseFloat(td.getAttribute('data-value'));
+                        cell.numFmt = '"R$" #.##0,00';
+                    } else if (val.startsWith('R$')) {
+                        const numStr = val.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
+                        cellValue = parseFloat(numStr) || 0;
+                        cell.numFmt = '"R$" #.##0,00';
+                    } else if (val.match(/^\d+,\d+$/)) {
+                        cellValue = parseFloat(val.replace(',', '.'));
+                        cell.numFmt = '#.##0,00';
+                    } else if (val.match(/^\d+$/)) {
+                        cellValue = parseInt(val);
+                    }
+
+                    cell.value = cellValue;
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+                    const rowspan = parseInt(td.getAttribute('rowspan') || 1);
+                    const colspan = parseInt(td.getAttribute('colspan') || 1);
+                    if (rowspan > 1 || colspan > 1) {
+                        worksheet.mergeCells(i + 1, colIndex, i + rowspan, colIndex + colspan - 1);
+                    }
+                    colIndex += colspan;
+                }
+            }
+
+            // SOLUÇÃO DE DOWNLOAD COMPATÍVEL COM POWER BI
+            workbook.xlsx.writeBuffer().then(buffer => {
+                try {
+                    // Criar blob
+                    const blob = new Blob([buffer], { 
+                        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+                    });
+                    
+                    // Criar URL temporária
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    // Criar link invisível
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'RDT_Export_' + new Date().toISOString().split('T')[0] + '.xlsx';
+                    
+                    // Adicionar ao DOM (necessário para Firefox/iframe)
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    
+                    // Disparar download
+                    link.click();
+                    
+                    // Limpeza após 100ms
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                } catch (error) {
+                    console.error('Erro no download:', error);
+                    alert('Erro ao baixar arquivo. Tente novamente.');
+                }
+            }).catch(err => {
+                console.error('Erro ao gerar Excel:', err);
+                alert('Erro ao gerar arquivo Excel. Verifique o console para detalhes.');
+            });
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
