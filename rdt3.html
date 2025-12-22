@@ -383,7 +383,7 @@
                     <td style="padding: 0;">
                         <select id="praca-select" class="form-select" onchange="updatePracaFields(this.value)">
                             <option value="">Selecione</option>
-                            <option value="TODAS">TODAS</option>
+                            <option value="TODAS">TODAS&nbsp;&nbsp;&nbsp;</option>
                             ${pracaOptions}
                         </select>
                     </td>
@@ -472,8 +472,8 @@
 
             const pracaSelect = document.getElementById('praca-select');
             for (let i = 0; i < pracaSelect.options.length; i++) {
-                if (pracaSelect.options[i].value === 'P1') {
-                    pracaSelect.value = 'P1';
+                if (pracaSelect.options[i].value === 'TODAS') {
+                    pracaSelect.value = 'TODAS';
                     break;
                 }
             }
