@@ -256,83 +256,90 @@
         // Fetch and process data on load
         async function init() {
             try {
+                // Mantém o texto visual simples "Carregando dados..."
                 document.getElementById('loading').style.display = 'block';
 
                 const url = 'https://daledwrho8auj.cloudfront.net/relatorios_json/relatorio_unificado_eixos.json';
                 const googleDriveUrl = 'https://suportemergencial.s3.sa-east-1.amazonaws.com/relatorios_json/relatorio_unificado_eixos.json';
 
+                // Helper para verificar tamanho (HEAD)
+                const getFileSize = async (src, name) => {
+                    try {
+                        const res = await fetch(src, { method: 'HEAD', cache: 'no-store' });
+                        if (res.ok) {
+                            return parseInt(res.headers.get('content-length') || '0');
+                        }
+                    } catch (e) { /* Silently fail for cleaning logs */ }
+                    return -1;
+                };
+
+                // 1. Comparar tamanhos em paralelo
+                const [sizeUrl, sizeGoogle] = await Promise.all([
+                    getFileSize(url, 'CloudFront'),
+                    getFileSize(googleDriveUrl, 'Google/S3')
+                ]);
+
+                // 2. Decidir fonte
+                let selectedUrl = url;
+                let selectedName = 'CloudFront';
+
+                // Lógica solicitada: Se Google/S3 for MAIOR, usa ele. Se for igual ou menor, usa CloudFront.
+                if (sizeGoogle > sizeUrl) {
+                    selectedUrl = googleDriveUrl;
+                    selectedName = 'Google/S3';
+                }
+
                 // Helper para buscar e normalizar
-                const fetchSource = async (srcUrl, name) => {
+                const fetchSource = async (srcUrl) => {
                     let json;
                     try {
-                        // Tentar direto
                         const response = await fetch(srcUrl, { cache: 'no-store' });
                         if (response.ok) {
                             json = await response.json();
                         } else {
-                            throw new Error('Fetch direto falhou');
+                            throw new Error('Fetch falhou');
                         }
                     } catch (e) {
-                        console.warn(`[${name}] Direto falhou, tentando proxy...`);
+                        // Fallback para Proxy
                         try {
                             const corsProxy = 'https://api.allorigins.win/raw?url=';
                             const response = await fetch(corsProxy + encodeURIComponent(srcUrl));
                             if (!response.ok) throw new Error('Proxy falhou');
                             json = await response.json();
                         } catch (e2) {
-                            console.error(`[${name}] Falha total:`, e2);
                             return null;
                         }
                     }
 
-                    // Normalizar
+                    // Normalizar dados
                     if (Array.isArray(json)) return json;
-                    if (json.contents && Array.isArray(json.contents)) return json.contents;
-                    if (json.data && Array.isArray(json.data)) return json.data;
-                    if (json.rows && Array.isArray(json.rows)) return json.rows;
-
-                    console.error(`[${name}] Formato inválido`);
+                    if (json && json.contents && Array.isArray(json.contents)) return json.contents;
+                    if (json && json.data && Array.isArray(json.data)) return json.data;
+                    if (json && json.rows && Array.isArray(json.rows)) return json.rows;
                     return null;
                 };
 
-                console.log("Iniciando comparação de fontes...");
+                // 3. Baixar dados da fonte escolhida
+                let data = await fetchSource(selectedUrl);
 
-                // Buscar em paralelo
-                const [dataUrl, dataGoogle] = await Promise.all([
-                    fetchSource(url, 'CloudFront (url)'),
-                    fetchSource(googleDriveUrl, 'Google/S3 (googleDriveUrl)')
-                ]);
-
-                let finalData = null;
-
-                if (dataUrl && dataGoogle) {
-                    console.log(`Comparando tamanhos: CloudFront=${dataUrl.length}, Google/S3=${dataGoogle.length}`);
-                    if (dataGoogle.length > dataUrl.length) {
-                        console.log('Utilizando Google/S3 (Maior)');
-                        finalData = dataGoogle;
-                    } else {
-                        console.log('Utilizando CloudFront (Igual ou Maior)');
-                        finalData = dataUrl;
-                    }
-                } else if (dataUrl) {
-                    console.log('Apenas CloudFront disponível');
-                    finalData = dataUrl;
-                } else if (dataGoogle) {
-                    console.log('Apenas Google/S3 disponível');
-                    finalData = dataGoogle;
-                } else {
-                    throw new Error('Todas as fontes de dados falharam');
+                // Fallback: se a escolhida falhar, tenta a outra
+                if (!data) {
+                    const fallbackUrl = (selectedUrl === url) ? googleDriveUrl : url;
+                    data = await fetchSource(fallbackUrl);
                 }
 
-                processData(finalData);
+                if (!data) throw new Error("Não foi possível carregar dados de nenhuma fonte.");
+
+                processData(data);
                 buildUI();
                 setDefaults();
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('app').style.display = 'block';
+
             } catch (err) {
                 console.error(err);
-                document.getElementById('loading').innerHTML = 'Erro ao carregar dados: ' + err.message;
+                document.getElementById('loading').innerText = 'Erro ao carregar dados: ' + err.message;
             }
         }
 
@@ -386,7 +393,7 @@
 
                 let pDisplay = String(row.praca || '');
                 if (pDisplay && pDisplay.startsWith('19')) {
-                    pDisplay = 'P' + pDisplay.substring(2);
+                    pDisplay = 'P' + pDisplay.substring(1);
                 }
                 if (pDisplay) pracas[pDisplay] = true;
             }
@@ -656,12 +663,12 @@
             const mediaRow = document.getElementById('rdt-media-row');
 
             const columnSums = Array(20).fill(0);
-            let validRowCount = 0;
+            // Count non-empty values per column (same logic as updated rdtog.html)
+            const columnCounts = Array(20).fill(0);
 
             for (let r = 0; r < daysInMonth && r < dataRows.length; r++) {
                 const row = dataRows[r];
                 if (row.cells[0].innerText) {
-                    let rowHasData = false;
                     for (let c = 2; c <= 21; c++) {
                         const cellText = row.cells[c].innerText;
                         let value = 0;
@@ -672,13 +679,18 @@
                         } else {
                             value = parseFloat(cellText) || 0;
                         }
+
                         columnSums[c - 2] += value;
-                        if (value > 0) rowHasData = true;
+
+                        // Count valid entries for average
+                        if (cellText !== '' && value !== 0) {
+                            columnCounts[c - 2]++;
+                        }
                     }
-                    if (rowHasData) validRowCount++;
                 }
             }
 
+            // Fill TOTAL row
             for (let c = 0; c < 20; c++) {
                 const sum = columnSums[c];
                 if (c === 19) {
@@ -691,13 +703,14 @@
                 }
             }
 
+            // Fill MEDIA row using column counts
             for (let c = 0; c < 20; c++) {
-                const avg = validRowCount > 0 ? columnSums[c] / validRowCount : 0;
+                const count = columnCounts[c];
+                const avg = count > 0 ? columnSums[c] / count : 0;
+
                 if (c === 19) {
                     mediaRow.cells[c + 1].innerText = avg ? formatBRL(avg) : '';
                     mediaRow.cells[c + 1].setAttribute('data-value', avg || 0);
-                } else if (c >= 16 && c <= 18) {
-                    mediaRow.cells[c + 1].innerText = avg ? avg.toFixed(2) : '';
                 } else {
                     mediaRow.cells[c + 1].innerText = avg ? avg.toFixed(2) : '';
                 }
@@ -736,30 +749,20 @@
         }
 
         function processTableToExcel(table, worksheet, workbook) {
-            // Set column widths (A=1, B=2, C=3...W=23)
-            worksheet.getColumn(1).width = 8;   // A - DIA
-            worksheet.getColumn(2).width = 6;   // B - SEM
-            worksheet.getColumn(3).width = 8;   // C - CAT-01
-            worksheet.getColumn(4).width = 8;   // D - CAT-02
-            worksheet.getColumn(5).width = 8;   // E - CAT-03
-            worksheet.getColumn(6).width = 8;   // F - CAT-04
-            worksheet.getColumn(7).width = 8;   // G - CAT-05
-            worksheet.getColumn(8).width = 8;   // H - CAT-06
-            worksheet.getColumn(9).width = 8;   // I - CAT-07
-            worksheet.getColumn(10).width = 8;  // J - CAT-08
-            worksheet.getColumn(11).width = 8;  // K - CAT-09
-            worksheet.getColumn(12).width = 8;  // L - CAT-10
-            worksheet.getColumn(13).width = 8;  // M - CAT-11
-            worksheet.getColumn(14).width = 9;  // N - CAT-ESP
-            worksheet.getColumn(15).width = 8;  // O - LEVE
-            worksheet.getColumn(16).width = 9;  // P - PESADO
-            worksheet.getColumn(17).width = 9;  // Q - TOTAL
-            worksheet.getColumn(18).width = 10; // R - EIXOS
-            worksheet.getColumn(19).width = 10; // S - LEVE EQ
-            worksheet.getColumn(20).width = 10; // T - PESADO EQ
-            worksheet.getColumn(21).width = 10; // U - TOTAL EQ
-            worksheet.getColumn(22).width = 16; // V - RECEITA
-            worksheet.getColumn(23).width = 10; // W - ESPECIAIS
+            // Set column widths
+            worksheet.getColumn(1).width = 8;
+            worksheet.getColumn(2).width = 6;
+            for (let k = 3; k <= 13; k++) worksheet.getColumn(k).width = 8; // Cats
+            worksheet.getColumn(14).width = 9;
+            worksheet.getColumn(15).width = 8;
+            worksheet.getColumn(16).width = 9;
+            worksheet.getColumn(17).width = 9;
+            worksheet.getColumn(18).width = 10;
+            worksheet.getColumn(19).width = 10;
+            worksheet.getColumn(20).width = 10;
+            worksheet.getColumn(21).width = 10;
+            worksheet.getColumn(22).width = 16;
+            worksheet.getColumn(23).width = 10;
 
             const rows = table.rows;
             for (let i = 0; i < rows.length; i++) {
@@ -769,6 +772,8 @@
 
                 for (let j = 0; j < tr.cells.length; j++) {
                     const td = tr.cells[j];
+
+                    // Merging logic lookup in worksheet
                     while (worksheet.getCell(i + 1, colIndex).isMerged) colIndex++;
 
                     const cell = row.getCell(colIndex);
@@ -778,25 +783,27 @@
 
                     let cellValue = val;
 
-                    // Check for data-value attribute (raw numeric values)
+                    // Numeric Parsing for Excel with BR Locale adjustment
+                    // We use standard Excel format codes. 
+                    // "#,##0.00" in Excel internal storage means "thousands sep, decimal sep 00".
+                    // When opened in BR Excel, it renders as "1.000,00".
+
                     if (td.hasAttribute('data-value')) {
                         cellValue = parseFloat(td.getAttribute('data-value'));
-                        cell.numFmt = '"R$" #.##0,00';
+                        cell.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
                     }
-                    // Currency detection (R$ format)
                     else if (val.startsWith('R$')) {
                         const numStr = val.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
                         cellValue = parseFloat(numStr) || 0;
-                        cell.numFmt = '"R$" #.##0,00';
+                        cell.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
                     }
-                    // Decimal with comma (Brazilian format like 123,45)
                     else if (val.match(/^\d+,\d+$/)) {
                         cellValue = parseFloat(val.replace(',', '.'));
-                        cell.numFmt = '#.##0,00';
+                        cell.numFmt = '#,##0.00';
                     }
-                    // Integer detection
                     else if (val.match(/^\d+$/)) {
                         cellValue = parseInt(val);
+                        cell.numFmt = '#,##0';
                     }
 
                     cell.value = cellValue;
@@ -814,33 +821,7 @@
 
             workbook.xlsx.writeBuffer().then(buffer => {
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-                // Try multiple download methods for compatibility
-                try {
-                    // Method 1: Standard saveAs (FileSaver.js)
-                    saveAs(blob, 'RDT_Export.xlsx');
-                } catch (e1) {
-                    try {
-                        // Method 2: Create download link and click
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'RDT_Export.xlsx';
-                        a.style.display = 'none';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                    } catch (e2) {
-                        try {
-                            // Method 3: Open in new window (for iframe contexts)
-                            const url = URL.createObjectURL(blob);
-                            window.open(url, '_blank');
-                        } catch (e3) {
-                            alert('Download não disponível neste contexto. Tente abrir em um navegador externo.');
-                        }
-                    }
-                }
+                saveAs(blob, 'RDT_Export_BR.xlsx');
             });
         }
 
