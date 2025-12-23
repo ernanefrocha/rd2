@@ -393,7 +393,7 @@
 
                 let pDisplay = String(row.praca || '');
                 if (pDisplay && pDisplay.startsWith('19')) {
-                    pDisplay = 'P' + pDisplay.substring(1);
+                    pDisplay = 'P' + pDisplay.substring(2);
                 }
                 if (pDisplay) pracas[pDisplay] = true;
             }
