@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>RDT - Rota do Pará</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            background-color: #fbfffe;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #d4d4d4;
+            padding-bottom: 5px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+        }
+
+        .tab-btn {
+            padding: 8px 20px;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            background-color: #fff;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            font-weight: bold;
+            color: #107c41;
+        }
+
+        .btn-download {
+            background-color: #107c41;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+        }
+
+        .btn-download:hover {
+            background-color: #0c5e31;
+        }
+
+        .btn-nav {
+            background-color: #72a6d4;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-nav:hover {
+            background-color: #5a8fc0;
+        }
+
+        .toolbar-buttons {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 16pt;
+            color: #666;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 1000px;
+            background-color: white;
+        }
+
+        th,
+        td {
+            border: 1px solid #bfbfbf;
+            padding: 2px 4px;
+            white-space: nowrap;
+            height: 20px;
+            overflow: hidden;
+            font-size: 10pt;
+        }
+
+        th {
+            background-color: #f3f3f3;
+            font-weight: normal;
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #bfbfbf;
+        }
+
+        .col-number {
+            text-align: right;
+        }
+
+        .col-date {
+            text-align: right;
+        }
+
+        .center-text {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .right-text {
+            text-align: right;
+            vertical-align: middle;
+        }
+
+        .bold-text {
+            font-weight: bold;
+        }
+
+        .header-merged {
+            background-color: #fff;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 14pt;
+        }
+
+        .header-rdt-title {
+            font-size: 12pt;
+        }
+
+        .form-select {
+            border: none;
+            font-family: inherit;
+            font-size: 11pt;
+            width: 100%;
+            text-align: center;
+            background: transparent;
+            cursor: pointer;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-select:focus {
+            outline: none;
+        }
+
+        .cell-label {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            vertical-align: middle;
+        }
+
+        tr:hover td {
+            background-color: #e8f5fd;
+        }
+
+        .sheet-container {
+            overflow: auto;
+            max-height: 85vh;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid #ccc;
+        }
+
+        .toolbar-filters {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background-color: #f3f3f3;
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid #d4d4d4;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .filter-label {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .toolbar-select {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-family: inherit;
+            font-size: 10pt;
+            background-color: white;
+            cursor: pointer;
+            color: #107c41;
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        .toolbar-select:focus {
+            outline: none;
+            border-color: #107c41;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="loading">Carregando dados do RDT (Aguarde)...</div>
+
+    <div id="app" style="display: none;">
+        <div class="toolbar">
+            <div class="tabs">
+                <button class="tab-btn">RDT</button>
+            </div>
+            <div id="toolbar-filters" class="toolbar-filters">
+                <!-- Filters will be injected here -->
+            </div>
+            <div class="toolbar-buttons">
+                <button class="btn-nav">INICIO</button>
+                <button class="btn-nav">DESTAQUES</button>
+                <button class="btn-nav">TRAFÉGO</button>
+                <button class="btn-nav">RECEITA</button>
+                <button class="btn-nav">ISENÇÃO</button>
+                <button class="btn-nav">EVASÃO</button>
+                <button class="btn-download" onclick="downloadExcelJS()">
+                    <span>⬇</span> Download (Em Breve)
+                </button>
+            </div>
+        </div>
+
+        <div class="sheet-container">
+            <table id="table-rdt">
+                <colgroup>
+                    <col style="width: 50px;"> <!-- DIA (1) -->
+                    <col style="width: 50px;"> <!-- SEM (2) -->
+                    <!-- CATS 1-11 (11 * 2 = 22) -->
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 35px;">
+                    <col style="width: 40px;">
+                    <col style="width: 40px;"> <!-- CAT-ESP (25, 26) -->
+                    <col style="width: 35px;">
+                    <col style="width: 35px;"> <!-- LEVE (27, 28) -->
+                    <col style="width: 35px;">
+                    <col style="width: 35px;"> <!-- PESADO (29, 30) -->
+                    <col style="width: 40px;">
+                    <col style="width: 40px;"> <!-- TOTAL ABS (31, 32) -->
+                    <col style="width: 60px;"> <!-- EIXOS (33) -->
+                    <col style="width: 40px;">
+                    <col style="width: 40px;"> <!-- LEVE EQ (34, 35) -->
+                    <col style="width: 40px;">
+                    <col style="width: 40px;"> <!-- PESADO EQ (36, 37) -->
+                    <col style="width: 40px;">
+                    <col style="width: 40px;"> <!-- TOTAL EQ (38, 39) -->
+                    <col style="width: 80px;">
+                    <col style="width: 80px;"> <!-- RECEITA (40, 41) -->
+                    <col style="width: 100px;">
+                    <col style="width: 100px;"> <!-- ESPECIAIS (42, 43) -->
+                </colgroup>
+                <thead id="rdt-header"></thead>
+                <tbody id="rdt-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Global data
+        let baseRotaData = [];
+        let uniqueMonths = [];
+        let uniquePracas = [];
+
+        const categoryLabels = ['CAT-01', 'CAT-02', 'CAT-03', 'CAT-04', 'CAT-05', 'CAT-06', 'CAT-07', 'CAT-08', 'CAT-09', 'CAT-10', 'CAT-11', 'CAT-ESP'];
+
+        const pracaMap = {
+            "P1": { city: "JACUNDÁ", road: "PA-150", km: "KM 52+600" },
+            "P2": { city: "GOIANÉSIA DO PARÁ I - PA", road: "PA-150", km: "KM 112+800" },
+            "P3": { city: "GOIANÉSIA DO PARÁ II - PA", road: "PA-150", km: "KM 179+700" },
+            "P4": { city: "MOJU - PA", road: "PA-150", km: "KM 229+800" },
+            "P5": { city: "TAILÂNDIA - PA", road: "PA-150", km: "KM 295+100" },
+            "P6": { city: "ACARÁ I - PA", road: "PA-475", km: "KM 13+500" },
+            "P7": { city: "ABAETETUBA", road: "PA-252", km: "KM 31+900" },
+            "P8": { city: "ACARÁ II", road: "ALÇA VIÁRIA", km: "KM 21+950" }
+        };
+
+        // Fetch and process data on load
+        async function init() {
+            try {
+                // Mantém o texto visual simples "Carregando dados..."
+                document.getElementById('loading').style.display = 'block';
+
+                const url = 'https://daledwrho8auj.cloudfront.net/relatorios_json/relatorio_unificado_eixos.json';
+                const googleDriveUrl = 'https://suportemergencial.s3.sa-east-1.amazonaws.com/relatorios_json/relatorio_unificado_eixos.json';
+
+                // Helper para verificar tamanho (HEAD)
+                const getFileSize = async (src, name) => {
+                    try {
+                        const res = await fetch(src, { method: 'HEAD', cache: 'no-store' });
+                        if (res.ok) {
+                            return parseInt(res.headers.get('content-length') || '0');
+                        }
+                    } catch (e) { /* Silently fail for cleaning logs */ }
+                    return -1;
+                };
+
+                // 1. Comparar tamanhos em paralelo
+                const [sizeUrl, sizeGoogle] = await Promise.all([
+                    getFileSize(url, 'CloudFront'),
+                    getFileSize(googleDriveUrl, 'Google/S3')
+                ]);
+
+                // 2. Decidir fonte
+                let selectedUrl = url;
+                let selectedName = 'CloudFront';
+
+                // Lógica solicitada: Se Google/S3 for MAIOR, usa ele. Se for igual ou menor, usa CloudFront.
+                if (sizeGoogle > sizeUrl) {
+                    selectedUrl = googleDriveUrl;
+                    selectedName = 'Google/S3';
+                }
+
+                // Helper para buscar e normalizar
+                const fetchSource = async (srcUrl) => {
+                    let json;
+                    try {
+                        const response = await fetch(srcUrl, { cache: 'no-store' });
+                        if (response.ok) {
+                            json = await response.json();
+                        } else {
+                            throw new Error('Fetch falhou');
+                        }
+                    } catch (e) {
+                        // Fallback para Proxy
+                        try {
+                            const corsProxy = 'https://api.allorigins.win/raw?url=';
+                            const response = await fetch(corsProxy + encodeURIComponent(srcUrl));
+                            if (!response.ok) throw new Error('Proxy falhou');
+                            json = await response.json();
+                        } catch (e2) {
+                            return null;
+                        }
+                    }
+
+                    // Normalizar dados
+                    if (Array.isArray(json)) return json;
+                    if (json && json.contents && Array.isArray(json.contents)) return json.contents;
+                    if (json && json.data && Array.isArray(json.data)) return json.data;
+                    if (json && json.rows && Array.isArray(json.rows)) return json.rows;
+                    return null;
+                };
+
+                // 3. Baixar dados da fonte escolhida
+                let data = await fetchSource(selectedUrl);
+
+                // Fallback: se a escolhida falhar, tenta a outra
+                if (!data) {
+                    const fallbackUrl = (selectedUrl === url) ? googleDriveUrl : url;
+                    data = await fetchSource(fallbackUrl);
+                }
+
+                if (!data) throw new Error("Não foi possível carregar dados de nenhuma fonte.");
+
+                processData(data);
+                buildUI();
+                setDefaults();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading').innerText = 'Erro ao carregar dados: ' + err.message;
+            }
+        }
+
+        function processData(data) {
+            const limitDate = new Date("2025-08-14");
+            const months = {};
+            const pracas = {};
+
+            for (const row of data) {
+                // Extract date
+                if (row.dia) {
+                    row.dia = row.dia.split('T')[0];
+                } else {
+                    continue;
+                }
+
+                // Filter by date
+                try {
+                    const rowDate = new Date(row.dia);
+                    if (rowDate <= limitDate) continue;
+                } catch (e) { continue; }
+
+                // Process idtipoviolacao
+                if (!row.idtipoviolacao) row.idtipoviolacao = "0";
+
+                // Process categoria_cat
+                if (row.categoria_cat) {
+                    let cat = row.categoria_cat;
+                    cat = cat.replace("-", "-0");
+                    cat = cat.replace("011", "11");
+                    cat = cat.replace("0ESP", "ESP");
+                    cat = cat.replace("010", "10");
+                    cat = cat.replace("012", "12");
+                    row.categoria_cat = cat;
+                }
+
+                // Filter by tipo
+                if (!row.tipo || (row.tipo !== "1" && row.tipo !== "3")) continue;
+
+                // Set defaults
+                row.praca = row.praca || '';
+                row.total_transacoes = parseFloat(row.total_transacoes) || 0;
+                row.soma_valor = parseFloat(row.soma_valor) || 0;
+                row.eixos_adicionais = parseFloat(row.eixos_adicionais) || 0;
+
+                baseRotaData.push(row);
+
+                // Extract unique values
+                const m = row.dia.substring(0, 7);
+                months[m] = true;
+
+                let pDisplay = String(row.praca || '');
+                if (pDisplay && pDisplay.startsWith('19')) {
+                    pDisplay = 'P' + pDisplay.substring(2);
+                }
+                if (pDisplay) pracas[pDisplay] = true;
+            }
+
+            uniqueMonths = Object.keys(months).sort();
+            uniquePracas = Object.keys(pracas).sort();
+        }
+
+        function buildUI() {
+            buildFilters();
+            buildHeader();
+            buildBody();
+        }
+
+        function buildFilters() {
+            const container = document.getElementById('toolbar-filters');
+            const monthOptions = uniqueMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+            const pracaOptions = uniquePracas.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            container.innerHTML = `
+                <div class="filter-group">
+                    <span class="filter-label">Mês:</span>
+                    <select id="month-select" class="toolbar-select" onchange="filterRDT(this.value)">
+                        <option value="">Selecione</option>
+                        ${monthOptions}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Praça:</span>
+                    <select id="praca-select" class="toolbar-select" onchange="updatePracaFields(this.value)">
+                        <option value="">Selecione</option>
+                        <option value="TODAS">TODAS</option>
+                        ${pracaOptions}
+                    </select>
+                </div>
+            `;
+        }
+
+        function buildHeader() {
+            const thead = document.getElementById('rdt-header');
+
+            // Month options
+            const monthOptions = uniqueMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+
+            // Praça options
+            const pracaOptions = uniquePracas.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            thead.innerHTML = `
+                <tr>
+                    <th rowspan="3" colspan="2" class="header-merged" style="padding: 0;">
+                        <img src="rota.png" alt="Rota do Pará" style="max-width: 100%; max-height: 80px; display: block; margin: auto;">
+                    </th>
+                    <th colspan="39" class="header-merged header-rdt-title">CENTRO DE CONTROLE DE ARRECADAÇÃO</th>
+                    <th rowspan="2" colspan="2" class="header-merged" style="font-size: 20pt;">RDT</th>
+                </tr>
+                <tr><th colspan="39" class="header-merged header-rdt-title">RESUMO DIÁRIO DE TRÁFEGO</th></tr>
+                <tr>
+                    <th colspan="39" class="header-merged header-rdt-title">ROTA DO PARÁ S/A</th>
+                    <th id="rdt-month-label" colspan="2" class="header-merged" style="padding: 0; font-size: 11pt; color: #107c41;"></th>
+                </tr>
+                <tr style="height: 30px;">
+                    <td colspan="2" class="cell-label center-text">DATA</td>
+                    <td colspan="10"></td>
+                    <td class="cell-label center-text">PRAÇA</td>
+                    <td id="rdt-praca-label" class="center-text bold-text" colspan="2"></td>
+                    <td colspan="2" class="cell-label right-text">MUNICÍPIO</td>
+                    <td id="rdt-municipio" class="center-text bold-text" colspan="2"></td>
+                    <td colspan="16"></td>
+                    <td id="rdt-rodovia" class="center-text bold-text" colspan="2"></td>
+                    <td id="rdt-km" class="center-text bold-text" colspan="1"></td>
+                    <td></td>
+                    <td class="center-text">COBRANÇA</td>
+                    <td class="center-text">DIRECIONAL</td>
+                    <td></td>
+                    <td class="center-text">OUTROS</td>
+                </tr>
+                <tr>
+                    <th rowspan="2" class="center-text">DIA</th>
+                    <th rowspan="2" class="center-text">SEM</th>
+                    <th colspan="30" class="center-text">VEÍCULOS ABSOLUTOS (PEDAGIADO)</th>
+                    <th rowspan="2" class="center-text" style="font-size: 9pt;">EIXOS ADICIONAIS</th>
+                    <th colspan="6" class="center-text">VEÍCULOS EQUIVALENTES</th>
+                    <th rowspan="2" colspan="2" class="center-text" style="font-size: 9pt;">RECEITA DO TRÁFEGO PEDAGIADO</th>
+                    <th rowspan="2" colspan="2" class="center-text" style="font-size: 9pt;">VEÍCULOS ESPECIAIS</th>
+                </tr>
+                <tr>
+                    <th colspan="2" class="center-text">CAT-01</th><th colspan="2" class="center-text">CAT-02</th><th colspan="2" class="center-text">CAT-03</th>
+                    <th colspan="2" class="center-text">CAT-04</th><th colspan="2" class="center-text">CAT-05</th><th colspan="2" class="center-text">CAT-06</th>
+                    <th colspan="2" class="center-text">CAT-07</th><th colspan="2" class="center-text">CAT-08</th><th colspan="2" class="center-text">CAT-09</th>
+                    <th colspan="2" class="center-text">CAT-10</th><th colspan="2" class="center-text">CAT-11</th><th colspan="2" class="center-text">CAT-ESP</th>
+                    <th colspan="2" class="center-text">LEVE</th><th colspan="2" class="center-text">PESADO</th><th colspan="2" class="center-text">TOTAL</th>
+                    <th colspan="2" class="center-text">LEVE</th><th colspan="2" class="center-text">PESADO</th><th colspan="2" class="center-text">TOTAL</th>
+                </tr>
+                <tr>
+                    <th class="center-text"></th><th class="center-text"></th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                    <th class="center-text"></th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                    <th class="center-text">REAL</th><th class="center-text">PN</th><th class="center-text">REAL</th><th class="center-text">PN</th>
+                </tr>
+            `;
+        }
+
+        function buildBody() {
+            const tbody = document.getElementById('rdt-body');
+            let html = '';
+
+            // 31 data rows
+            for (let r = 0; r < 31; r++) {
+                html += '<tr><td class="col-date"></td><td class="center-text"></td>';
+                for (let c = 2; c < 43; c++) html += '<td class="col-number"></td>';
+                html += '</tr>';
+            }
+
+            // TOTAL row
+            html += '<tr id="rdt-total-row" style="font-weight: bold; background-color: #f0f0f0;">';
+            html += '<td colspan="2" class="center-text">TOTAL</td>';
+            for (let c = 2; c < 43; c++) html += '<td class="col-number"></td>';
+            html += '</tr>';
+
+            // % REAL X PN row
+            html += '<tr id="rdt-percent-row" style="font-weight: bold; background-color: #f8f8f8;">';
+            html += '<td colspan="2" class="center-text">% REAL X PN</td>';
+            for (let i = 0; i < 15; i++) html += '<td colspan="2" class="col-number"></td>'; // Cats 1-11, CAT-ESP, LEVE, PESADO, TOTAL ABS
+            html += '<td class="col-number"></td>'; // EIXOS
+            for (let i = 0; i < 5; i++) html += '<td colspan="2" class="col-number"></td>';  // EQ Rows, RECEITA, ESPECIAIS
+            html += '</tr>';
+
+            // REPRESATIVIDADE DA CAT PN row
+            html += '<tr id="rdt-represent-row" style="font-weight: bold; background-color: #f8f8f8;">';
+            html += '<td colspan="2" class="center-text">REPRESATIVIDADE DA CAT PN</td>';
+            for (let i = 0; i < 15; i++) html += '<td colspan="2" class="col-number"></td>'; // Cats 1-11, CAT-ESP, LEVE, PESADO, TOTAL ABS
+            html += '<td class="col-number"></td>'; // EIXOS
+            for (let i = 0; i < 5; i++) html += '<td colspan="2" class="col-number"></td>';  // EQ Rows, RECEITA, ESPECIAIS
+            html += '</tr>';
+
+            // MÉDIA row
+            html += '<tr id="rdt-media-row" style="font-weight: bold; background-color: #e8e8e8;">';
+            html += '<td colspan="2" class="center-text">MÉDIA</td>';
+            for (let c = 2; c < 43; c++) html += '<td class="col-number"></td>';
+            html += '</tr>';
+
+            tbody.innerHTML = html;
+        }
+
+        function setDefaults() {
+            const now = new Date();
+            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+            const monthSelect = document.getElementById('month-select');
+            for (let i = 0; i < monthSelect.options.length; i++) {
+                if (monthSelect.options[i].value === currentMonth) {
+                    monthSelect.value = currentMonth;
+                    break;
+                }
+            }
+            if (!monthSelect.value && monthSelect.options.length > 1) {
+                monthSelect.value = monthSelect.options[1].value;
+            }
+
+            const pracaSelect = document.getElementById('praca-select');
+            for (let i = 0; i < pracaSelect.options.length; i++) {
+                if (pracaSelect.options[i].value === 'TODAS') {
+                    pracaSelect.value = 'TODAS';
+                    break;
+                }
+            }
+
+            if (pracaSelect.value) updatePracaFields(pracaSelect.value);
+            if (monthSelect.value) filterRDT(monthSelect.value);
+        }
+
+        function updatePracaFields(val) {
+            const pracaLabel = document.getElementById('rdt-praca-label');
+            const municField = document.getElementById('rdt-municipio');
+            const rodoviaField = document.getElementById('rdt-rodovia');
+            const kmField = document.getElementById('rdt-km');
+
+            if (pracaLabel) pracaLabel.innerText = val;
+
+            if (val === 'TODAS') {
+                municField.innerText = "";
+                rodoviaField.innerText = "";
+                kmField.innerText = "";
+            } else if (pracaMap[val]) {
+                municField.innerText = pracaMap[val].city;
+                rodoviaField.innerText = pracaMap[val].road;
+                kmField.innerText = pracaMap[val].km;
+            } else {
+                municField.innerText = "";
+                rodoviaField.innerText = "";
+                kmField.innerText = "";
+            }
+
+            const monthSelect = document.getElementById('month-select');
+            if (monthSelect && monthSelect.value) {
+                filterRDT(monthSelect.value);
+            }
+        }
+
+        function filterRDT(month) {
+            const monthLabel = document.getElementById('rdt-month-label');
+            if (monthLabel) monthLabel.innerText = month ? month : '';
+
+            if (!month) return;
+
+            const [year, monthNum] = month.split('-').map(Number);
+            const daysInMonth = new Date(year, monthNum, 0).getDate();
+            const dayNames = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+
+            const tbody = document.getElementById('rdt-body');
+            const rows = tbody.querySelectorAll('tr:not(#rdt-total-row):not(#rdt-media-row)');
+
+            const pracaSelect = document.getElementById('praca-select');
+            const selectedPraca = pracaSelect.value;
+
+            for (let day = 1; day <= 31; day++) {
+                const row = rows[day - 1];
+                if (!row) continue;
+
+                if (day <= daysInMonth) {
+                    const date = new Date(year, monthNum - 1, day);
+                    const dayStr = String(day).padStart(2, '0');
+                    const monthStr = String(monthNum).padStart(2, '0');
+                    const dateDisplay = `${dayStr}/${monthStr}`;
+                    const fullDate = `${year}-${monthStr}-${dayStr}`;
+
+                    row.cells[0].innerText = dateDisplay;
+                    row.cells[1].innerText = dayNames[date.getDay()];
+
+                    if (selectedPraca) {
+                        calculateRowValues(row, fullDate, selectedPraca);
+                    } else {
+                        for (let i = 2; i < row.cells.length; i++) row.cells[i].innerText = '';
+                    }
+                } else {
+                    for (let i = 0; i < row.cells.length; i++) row.cells[i].innerText = '';
+                }
+            }
+
+            calculateSummaryRows(daysInMonth);
+        }
+
+        function calculateRowValues(row, fullDate, selectedPraca) {
+            const aggregateAll = (selectedPraca === 'TODAS');
+            let pracaValue = selectedPraca;
+            if (!aggregateAll && selectedPraca.startsWith('P')) {
+                pracaValue = '19' + selectedPraca.substring(1);
+            }
+
+            const baseCriteria = { 'dia': fullDate };
+            const getCriteria = (category) => {
+                const c = { ...baseCriteria };
+                if (category) c.categoria_cat = category;
+                if (!aggregateAll) c.praca = pracaValue;
+                return c;
+            };
+
+            const categorySums = [];
+            for (let i = 0; i < categoryLabels.length; i++) {
+                const sum = sumIfs(baseRotaData, 'total_transacoes', getCriteria(categoryLabels[i]));
+                categorySums.push(sum);
+                if (i < 11) {
+                    row.cells[2 + i * 2].innerText = sum || '';
+                } else {
+                    row.cells[24].innerText = sum || ''; // CAT-ESP
+                }
+            }
+
+            const leve = (categorySums[0] || 0) + (categorySums[2] || 0) + (categorySums[4] || 0);
+            row.cells[26].innerText = leve || ''; // LEVE REAL
+            const pesado = (categorySums[1] || 0) + (categorySums[3] || 0) + (categorySums[5] || 0) +
+                (categorySums[6] || 0) + (categorySums[7] || 0) + (categorySums[8] || 0) +
+                (categorySums[9] || 0) + (categorySums[10] || 0);
+            row.cells[28].innerText = pesado || ''; // PESADO REAL
+            row.cells[30].innerText = (leve + pesado) || ''; // TOTAL ABS REAL (index 30)
+            // index 31 is TOTAL PN
+
+            const eixosCriteria = { ...baseCriteria };
+            if (!aggregateAll) eixosCriteria.praca = pracaValue;
+            const eixosAdicionais = sumIfs(baseRotaData, 'eixos_adicionais', eixosCriteria);
+            row.cells[32].innerText = eixosAdicionais || '';
+
+            const leveEq = (categorySums[0] || 0) * 1 + (categorySums[2] || 0) * 1.5 + (categorySums[4] || 0) * 2;
+            row.cells[33].innerText = leveEq ? leveEq.toFixed(2) : '';
+            const pesadoEq = (categorySums[1] || 0) * 2 + (categorySums[3] || 0) * 3 + (categorySums[5] || 0) * 4 +
+                (categorySums[6] || 0) * 5 + (categorySums[7] || 0) * 6 + (categorySums[8] || 0) * 7 +
+                (categorySums[9] || 0) * 8 + (categorySums[10] || 0) * 9 + (eixosAdicionais || 0);
+            row.cells[35].innerText = pesadoEq ? pesadoEq.toFixed(2) : '';
+            row.cells[37].innerText = (leveEq + pesadoEq) ? (leveEq + pesadoEq).toFixed(2) : ''; // TOTAL EQ REAL
+            // index 38 is TOTAL EQ PN
+
+            const revenueCriteria = { ...baseCriteria };
+            if (!aggregateAll) revenueCriteria.praca = pracaValue;
+            const revenue = sumIfs(baseRotaData, 'soma_valor', revenueCriteria);
+            row.cells[39].innerText = revenue ? formatBRL(revenue) : '';
+            row.cells[39].setAttribute('data-value', revenue || 0);
+
+            // SPECIALS (index 41)
+            row.cells[41].innerText = '';
+        }
+
+        function calculateSummaryRows(daysInMonth) {
+            const tbody = document.getElementById('rdt-body');
+            const dataRows = tbody.querySelectorAll('tr:not(#rdt-total-row):not(#rdt-percent-row):not(#rdt-represent-row):not(#rdt-media-row)');
+            const totalRow = document.getElementById('rdt-total-row');
+            const percentRow = document.getElementById('rdt-percent-row');
+            const representRow = document.getElementById('rdt-represent-row');
+            const mediaRow = document.getElementById('rdt-media-row');
+
+            const columnSums = Array(41).fill(0);
+            const columnCounts = Array(41).fill(0);
+
+            for (let r = 0; r < daysInMonth && r < dataRows.length; r++) {
+                const row = dataRows[r];
+                if (row.cells[0].innerText) {
+                    for (let c = 2; c <= 42; c++) {
+                        const cellText = row.cells[c].innerText;
+                        let value = 0;
+                        if (cellText.startsWith('R$')) {
+                            value = parseFloat(cellText.replace('R$', '').trim().replace(/\./g, '').replace(',', '.')) || 0;
+                        } else if (cellText.includes(',')) {
+                            value = parseFloat(cellText.replace(',', '.')) || 0;
+                        } else {
+                            value = parseFloat(cellText) || 0;
+                        }
+
+                        columnSums[c - 2] += value;
+                        if (cellText !== '' && value !== 0) {
+                            columnCounts[c - 2]++;
+                        }
+                    }
+                }
+            }
+
+            // Fill TOTAL row
+            for (let c = 0; c < 41; c++) {
+                const sum = columnSums[c];
+                // Revenue columns (indices 37-38 in columnSums, col 39-40)
+                if (c === 37 || c === 38) {
+                    totalRow.cells[c + 1].innerText = sum ? formatBRL(sum) : '';
+                    totalRow.cells[c + 1].setAttribute('data-value', sum || 0);
+                } else if ((c >= 28 && c <= 36) || (c >= 39)) { // ABS TOTAL, EIXOS, EQ columns, Specials
+                    totalRow.cells[c + 1].innerText = sum ? sum.toFixed(2) : '';
+                } else {
+                    totalRow.cells[c + 1].innerText = sum || '';
+                }
+            }
+
+            // Fill % REAL X PN row
+            // Logic removed - leaving row empty for now per user request
+
+            // Fill REPRESATIVIDADE row
+            const representPairs = [
+                [0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15], [16, 17], [18, 19], [20, 21], // CAT 1-11
+                [22, 23], // CAT-ESP
+                [24, 25], [26, 27], [28, 29], // LEVE, PESADO, TOTAL ABS
+                [31, 32], [33, 34], [35, 36], // LEVE EQ, PESADO EQ, TOTAL EQ
+                [37, 38], [39, 40] // RECEITA, SPECIALS
+            ];
+
+            representPairs.forEach((pair, idx) => {
+                const realVal = columnSums[pair[0]];
+                const pnVal = columnSums[pair[1]];
+                let targetCellIdx = idx + 1;
+                if (idx >= 15) targetCellIdx++; // Skip index 16 for Eixos
+
+                if (pnVal && pnVal > 0) {
+                    const res = (realVal / pnVal) * 100;
+                    representRow.cells[targetCellIdx].innerText = res.toFixed(2).replace('.', ',') + '%';
+                } else {
+                    representRow.cells[targetCellIdx].innerText = '';
+                }
+            });
+
+            // Fill MEDIA row using column counts
+            for (let c = 0; c < 41; c++) {
+                const count = columnCounts[c];
+                const avg = count > 0 ? columnSums[c] / count : 0;
+
+                if (c === 37 || c === 38) {
+                    mediaRow.cells[c + 1].innerText = avg ? formatBRL(avg) : '';
+                    mediaRow.cells[c + 1].setAttribute('data-value', avg || 0);
+                } else {
+                    mediaRow.cells[c + 1].innerText = avg ? avg.toFixed(2) : '';
+                }
+            }
+        }
+
+        function sumIfs(data, sumColumn, criteria) {
+            let sum = 0;
+            for (const row of data) {
+                let match = true;
+                for (const [col, val] of Object.entries(criteria)) {
+                    if (row[col] != val) { match = false; break; }
+                }
+                if (match) sum += parseFloat(row[sumColumn]) || 0;
+            }
+            return sum;
+        }
+
+        function formatBRL(value) {
+            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+
+        function downloadExcelJS() {
+            const table = document.getElementById('table-rdt');
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('RDT');
+
+            fetch('rota.png')
+                .then(response => response.arrayBuffer())
+                .then(buffer => {
+                    const imageId = workbook.addImage({ buffer: buffer, extension: 'png' });
+                    worksheet.addImage(imageId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 3 } });
+                    processTableToExcel(table, worksheet, workbook);
+                })
+                .catch(() => processTableToExcel(table, worksheet, workbook));
+        }
+
+        function processTableToExcel(table, worksheet, workbook) {
+            // Set column widths
+            worksheet.getColumn(1).width = 8;  // DIA
+            worksheet.getColumn(2).width = 6;  // SEM
+            for (let k = 3; k <= 24; k++) worksheet.getColumn(k).width = 7; // Cats 1-11 REAL/PN
+            worksheet.getColumn(25).width = 10; // CAT-ESP REAL
+            worksheet.getColumn(26).width = 10; // CAT-ESP PN
+            for (let k = 27; k <= 32; k++) worksheet.getColumn(k).width = 8; // LEVE/PESADO/TOTAL ABS REAL/PN
+            worksheet.getColumn(33).width = 10; // EIXOS
+            for (let k = 34; k <= 39; k++) worksheet.getColumn(k).width = 9; // LEVE/PESADO/TOTAL EQ REAL/PN
+            worksheet.getColumn(40).width = 14; // RECEITA REAL
+            worksheet.getColumn(41).width = 14; // RECEITA PN
+            worksheet.getColumn(42).width = 12; // ESPECIAIS REAL
+            worksheet.getColumn(43).width = 12; // ESPECIAIS PN
+
+            const rows = table.rows;
+            for (let i = 0; i < rows.length; i++) {
+                const tr = rows[i];
+                const row = worksheet.getRow(i + 1);
+                let colIndex = 1;
+
+                for (let j = 0; j < tr.cells.length; j++) {
+                    const td = tr.cells[j];
+
+                    // Merging logic lookup in worksheet
+                    while (worksheet.getCell(i + 1, colIndex).isMerged) colIndex++;
+
+                    const cell = row.getCell(colIndex);
+                    let val = td.innerText.trim();
+                    const select = td.querySelector('select');
+                    if (select) val = select.value || '';
+
+                    let cellValue = val;
+
+                    // Numeric Parsing for Excel with BR Locale adjustment
+                    // We use standard Excel format codes. 
+                    // "#,##0.00" in Excel internal storage means "thousands sep, decimal sep 00".
+                    // When opened in BR Excel, it renders as "1.000,00".
+
+                    if (td.hasAttribute('data-value')) {
+                        cellValue = parseFloat(td.getAttribute('data-value'));
+                        cell.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+                    }
+                    else if (val.startsWith('R$')) {
+                        const numStr = val.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
+                        cellValue = parseFloat(numStr) || 0;
+                        cell.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+                    }
+                    else if (val.match(/^\d+,\d+$/)) {
+                        cellValue = parseFloat(val.replace(',', '.'));
+                        cell.numFmt = '#,##0.00';
+                    }
+                    else if (val.match(/^\d+$/)) {
+                        cellValue = parseInt(val);
+                        cell.numFmt = '#,##0';
+                    }
+
+                    cell.value = cellValue;
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+                    const rowspan = parseInt(td.getAttribute('rowspan') || 1);
+                    const colspan = parseInt(td.getAttribute('colspan') || 1);
+                    if (rowspan > 1 || colspan > 1) {
+                        worksheet.mergeCells(i + 1, colIndex, i + rowspan, colIndex + colspan - 1);
+                    }
+                    colIndex += colspan;
+                }
+            }
+
+            workbook.xlsx.writeBuffer().then(buffer => {
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                saveAs(blob, 'RDT_Export_BR.xlsx');
+            });
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+
+</html>
